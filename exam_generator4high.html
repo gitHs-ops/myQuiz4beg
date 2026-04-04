@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" href="data:,">
-<title>고등학교 전과목 시험지 생성기 ver1.0</title>
+<title>고등학교 전과목 시험지 생성기 ver1.1</title>
 <link href="https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@400;700;800&family=Pretendard:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -220,8 +220,8 @@ header::before{
 <header>
   <div class="hdr-inner">
     <a href="index.html" class="btn-home">← 홈으로</a>
-    <div class="hdr-label">AI-Powered · 교육부 2015·2022 개정 고등학교 교육과정 ver1.0</div>
-    <h1 class="hdr-title">고등학교 <span>전과목</span> 시험지 생성기 <sup style="font-size:.45em;font-family:'Pretendard',sans-serif;font-weight:700;background:rgba(37,99,235,.15);color:#2563eb;padding:3px 8px;border-radius:10px;vertical-align:middle;letter-spacing:.04em;">v1.0</sup></h1>
+    <div class="hdr-label">AI-Powered · 교육부 2015·2022 개정 고등학교 교육과정 ver1.1</div>
+    <h1 class="hdr-title">고등학교 <span>전과목</span> 시험지 생성기 <sup style="font-size:.45em;font-family:'Pretendard',sans-serif;font-weight:700;background:rgba(37,99,235,.15);color:#2563eb;padding:3px 8px;border-radius:10px;vertical-align:middle;letter-spacing:.04em;">v1.1</sup></h1>
     <p class="hdr-sub">과목·학년·학기·단원을 선택하면 AI가 고등학교 수준의 맞춤형 시험지를 즉시 생성합니다</p>
     <div class="hdr-stats">
       <div class="hdr-stat">📚 지원 과목 <span>12과목</span></div>
@@ -292,6 +292,7 @@ header::before{
           <option value="easy">하 (기본)</option>
           <option value="mid" selected>중 (보통)</option>
           <option value="hard">상 (심화)</option>
+          <option value="adv">고급 (활용형)</option>
           <option value="mix">혼합</option>
         </select>
       </div>
@@ -706,7 +707,7 @@ const COURSE_MAP = {
 
 const COURSE_LABELS = {all:'전체 과목',common:'공통과목 (고1)',liberal:'문과 계열',science:'이과 계열'};
 
-const LEVEL_NAME = {easy:'하(기본)',mid:'중(보통)',hard:'상(심화)',mix:'혼합'};
+const LEVEL_NAME = {easy:'하(기본)',mid:'중(보통)',hard:'상(심화)',adv:'고급(활용형)',mix:'혼합'};
 
 let currentSubj = null;
 let currentQuestions = [];
@@ -896,6 +897,7 @@ JSON 형식 (배열):
 - fill 타입은 type을 "fill"로, choices 생략
 - 정답 위치(①②③④⑤)가 고르게 분포
 - JSON 배열만 반환, 코드블록(\`\`\`) 사용 금지
+${level === 'adv' ? `- 고급(활용형) 난이도: 단순 암기·개념 확인이 아닌 실제 적용·추론·분석 문제. 복합 자료(지문·그래프·표) 해석, 다단계 사고 요구, 수능 고난도(3점) 수준으로 출제. 오답 선지는 그럴듯하게 구성` : ''}
 - 반드시 ${count}개 생성`;
 
   try {
