@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>중학교 전과목 시험지 생성기 ver1.8</title>
+<link rel="icon" href="data:,">
+<title>고등학교 전과목 시험지 생성기 ver1.0</title>
 <link href="https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@400;700;800&family=Pretendard:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -365,6 +366,11 @@ header::before{
         <div id="sel-unit" style="display:flex;flex-direction:column;gap:5px;padding:8px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius-sm);max-height:160px;overflow-y:auto;"></div>
       </div>
       <div class="cfg-item">
+        <label>학생 이름</label>
+        <input type="text" id="sel-name" placeholder="이름 입력 (선택)" maxlength="10"
+          style="width:100%;padding:9px 11px;border:1px solid var(--border2);border-radius:var(--radius-sm);font-family:inherit;font-size:.88rem;background:var(--bg2);color:var(--text);">
+      </div>
+      <div class="cfg-item">
         <label>문항 수</label>
         <select id="sel-count">
           <option value="5">5문항</option>
@@ -456,6 +462,13 @@ header::before{
 // ── 프록시 URL 설정 ──
 // exam-proxy.gs를 Apps Script에 배포한 후 아래 URL을 입력하세요
 const EXAM_PROXY_URL = "https://script.google.com/macros/s/AKfycbyfB5Xi7V8qC4a1rKP24ArexpA02un5SnyhmuRlwh43nD6OXgEosC5aMwD8AZU4_zlmWQ/exec";
+
+// 구글 시트 기록 프록시
+const SHEET_PROXY_URL = 'https://script.google.com/macros/s/AKfycbyK-oRazcbrRkYw_5_S6ZNL49BngUrTK_6dbtiqS93v-OehYWwvkzBqN5hYJNzna06fnw/exec';
+
+// 로그인 페이지에서 넘어온 이메일/전화번호 읽기
+const _urlParams  = new URLSearchParams(window.location.search);
+const LOGIN_EMAIL = _urlParams.get('email') || _urlParams.get('phone') || '(미로그인)';
 
 // ══════════════════════════════════════════
 //  과목 데이터
@@ -781,18 +794,17 @@ JSON 형식 (배열):
 
   try {
     let raw = '';
+    let usageData = null;
 
     if (EXAM_PROXY_URL && EXAM_PROXY_URL !== 'YOUR_EXAM_PROXY_URL') {
-      // ── Apps Script 프록시 경유 (no-cors 우회용 간소화 방식) ──
       const encoded = encodeURIComponent(prompt);
       const res = await fetch(EXAM_PROXY_URL + '?prompt=' + encoded, { redirect: 'follow' });
       const data = await res.json();
       if (data.error) throw new Error('proxy: ' + data.error);
       raw = data.text || '';
       if (!raw) throw new Error('empty response from proxy');
-      if (data.usage) updateTokenTracker(data.usage);
+      if (data.usage) { updateTokenTracker(data.usage); usageData = data.usage; }
     } else {
-      // ── 직접 호출 (로컬 환경) ──
       const res = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -800,15 +812,14 @@ JSON 형식 (배열):
       });
       const data = await res.json();
       if (data.content) data.content.forEach(b => { if (b.type === 'text') raw += b.text; });
+      if (data.usage) { updateTokenTracker(data.usage); usageData = data.usage; }
     }
 
     console.log('프록시 응답 raw:', raw.substring(0, 500));
-    // 코드블록 제거
     raw = raw.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
     const m = raw.match(/\[[\s\S]*\]/);
     if (!m) throw new Error('JSON parse error: ' + raw.substring(0,100));
     const parsed = JSON.parse(m[0]);
-    // 한국어 키 → 영문 키 변환 (Claude가 한국어로 반환한 경우 대비)
     currentQuestions = parsed.map(q => ({
       type: q.type || (q['선택지'] ? 'choice' : 'fill'),
       qtype: q.qtype || 'concept',
@@ -818,6 +829,8 @@ JSON 형식 (배열):
       explanation: q.explanation || q['해설'] || q['설명'] || ''
     }));
     renderExam({s, grade, sem, pub, unit, count, level});
+    // ── 구글 시트 기록 전송 ──
+    if (typeof usageData !== 'undefined' && usageData) logToSheet(usageData);
   } catch(err) {
     console.error(err);
     if (!EXAM_PROXY_URL || EXAM_PROXY_URL === 'YOUR_EXAM_PROXY_URL') {
@@ -1050,6 +1063,39 @@ function resetAllTokenCount(){
     }
   }
 })();
+
+// ── 구글 시트 기록 전송 (GET + URL 파라미터) ──────────
+async function logToSheet(usage) {
+  if (!SHEET_PROXY_URL || SHEET_PROXY_URL.includes('여기에')) return;
+  try {
+    const studentName = document.getElementById('sel-name')?.value.trim() || '(미입력)';
+    const inp   = usage.input_tokens  || 0;
+    const out   = usage.output_tokens || 0;
+    const total = inp + out;
+
+    // 클라이언트 IP 조회
+    let clientIp = '(알 수 없음)';
+    try {
+      const ipRes  = await fetch('https://api.ipify.org?format=json');
+      const ipData = await ipRes.json();
+      clientIp = ipData.ip || '(알 수 없음)';
+    } catch(_) {}
+
+    const qs = new URLSearchParams({
+      name:   studentName,
+      tokens: total,
+      input:  inp,
+      output: out,
+      email:  LOGIN_EMAIL,
+      subj:   '고' + (document.getElementById('sel-grade')?.value || '') + '학년 ' + (SUBJECTS[currentSubj]?.name || currentSubj),
+      ip:     clientIp,
+      ts:     new Date().toISOString()
+    });
+    await fetch(`${SHEET_PROXY_URL}?${qs.toString()}`, { redirect: 'follow' });
+  } catch(e) {
+    console.warn('시트 기록 실패(무시):', e.message);
+  }
+}
 </script>
 </body>
 </html>
