@@ -13,7 +13,7 @@
 //   배포 관리 → 기존 배포 편집 → 새 버전 (URL 유지)
 // ══════════════════════════════════════════════════════
 
-const SHEET_ID        = '1vewPYqhQZMNYK8y3--fOt2zRpILk638u5KF8YOj4MAI';
+const SHEET_ID        = '1l7qq0_H4eWqJLtMOXbIJAU-Djo1EfZYy3x4a6Szy08Q';
 const SHEET_NAME      = '시험지로그';   // 로그 시트
 const MEMBER_SHEET    = '회원목록';     // 회원 관리 시트
 const WAIT_SHEET      = '대기목록';     // 처음 이용자 신청 대기
@@ -25,7 +25,7 @@ function doGet(e) {
 
   // ── 관리자에게 신청 알림 ──
   if (action === 'notify') {
-    return notifyAdmin(e.parameter.id || '', e.parameter.smsOnly === '1');
+    return notifyAdmin(e.parameter.id || '');
   }
 
   // ── 이메일/전화번호 조회 ──
@@ -50,9 +50,8 @@ function doGet(e) {
 }
 
 // ── 관리자에게 신청 알림 + 대기목록 저장 ────────────────
-function notifyAdmin(id, smsOnly) {
+function notifyAdmin(id) {
   try {
-    // 대기목록 시트에 저장
     const ss    = SpreadsheetApp.openById(SHEET_ID);
     let   wait  = ss.getSheetByName(WAIT_SHEET);
     if (!wait) {
@@ -62,7 +61,6 @@ function notifyAdmin(id, smsOnly) {
       wait.setFrozenRows(1);
     }
     const kstStr = Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd HH:mm:ss');
-    // 중복 신청 방지
     const rows = wait.getDataRange().getValues();
     const exists = rows.some((r, i) => i > 0 && (r[1]||'').toString().trim().toLowerCase() === id.toLowerCase());
     if (!exists) {
@@ -70,20 +68,12 @@ function notifyAdmin(id, smsOnly) {
       wait.appendRow([kstStr, idForSheet, '대기중']);
     }
 
-    // 관리자에게 이메일 알림 (전화번호 신청 시 생략)
-    if (!smsOnly) {
-      const ADMIN_EMAIL = 'khsq2011@gmail.com';
-      const msg =
-        '[전과목 시험지 생성기(초등학교)] 이용 신청\n\n' +
-        '신청자: ' + id + '\n\n' +
-        '승인하려면 로그인 페이지에서 관리자 버튼으로 등록해 주세요.\n' +
-        'https://giths-ops.github.io/myQuiz4beg/';
-      MailApp.sendEmail({
-        to:      ADMIN_EMAIL,
-        subject: '[시험지 생성기(초등학교)] 이용 신청 — ' + id,
-        body:    msg
-      });
-    }
+    // 관리자에게 이메일 알림
+    MailApp.sendEmail({
+      to:      'khsq2011@gmail.com',
+      subject: '[시험지 생성기(초등학교)] 이용 신청 — ' + id,
+      body:    '[전과목 시험지 생성기(초등학교)] 이용 신청\n\n신청자: ' + id + '\n\n승인하려면 로그인 페이지에서 관리자 버튼으로 등록해 주세요.\nhttps://giths-ops.github.io/myQuiz4beg/'
+    });
     return result(true, '신청 완료');
   } catch(err) {
     Logger.log('관리자 알림 오류: ' + err.message);
@@ -165,48 +155,18 @@ function registerMember(id, memo) {
       '아래 주소에서 서비스를 이용하실 수 있습니다.\n' +
       'https://giths-ops.github.io/myQuiz4beg/';
 
-    const isPhone = /^01[016789]\d{7,8}$/.test(id.replace(/-/g, ''));
     const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(id);
 
-    // 사용자에게 발송
-    if (isPhone) sendApprovalSms(id.replace(/-/g, ''), approvalMsg);
+    // 사용자에게 이메일 발송
     if (isEmail) sendApprovalEmail(id, approvalMsg);
 
-    // 관리자에게 조건부 발송 (사용자와 동일한 채널로)
+    // 관리자에게 이메일 발송
     const adminMsg = '[승인 완료 알림]\n등록자: ' + id + '\n\n' + approvalMsg;
-    if (isPhone) sendApprovalSms('01026989056', adminMsg);
-    if (isEmail) sendApprovalEmail('khsq2011@gmail.com', adminMsg);
+    sendApprovalEmail('khsq2011@gmail.com', adminMsg);
 
     return result(true, '등록 완료');
   } catch(err) {
     return result(false, err.message);
-  }
-}
-
-// ── 승인 SMS (솔라피) ──────────────────────────────────
-function sendApprovalSms(receiver, msg) {
-  try {
-    const API_KEY    = PropertiesService.getScriptProperties().getProperty('SOLAPI_KEY');
-    const API_SECRET = PropertiesService.getScriptProperties().getProperty('SOLAPI_SECRET');
-    const SENDER     = '01026989056';
-
-    const dateTime  = new Date().toISOString();
-    const salt      = Utilities.getUuid().replace(/-/g, '');
-    const signBytes = Utilities.computeHmacSha256Signature(
-      dateTime + salt, API_SECRET, Utilities.Charset.UTF_8
-    );
-    const signature = signBytes.map(b => ('0' + (b & 0xFF).toString(16)).slice(-2)).join('');
-    const authHeader = `HMAC-SHA256 apiKey=${API_KEY}, date=${dateTime}, salt=${salt}, signature=${signature}`;
-
-    const res = UrlFetchApp.fetch('https://api.solapi.com/messages/v4/send', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json; charset=utf-8', 'Authorization': authHeader },
-      payload: JSON.stringify({ message: { to: receiver, from: SENDER, text: msg } }),
-      muteHttpExceptions: true
-    });
-    Logger.log('솔라피 응답: ' + res.getResponseCode() + ' / ' + res.getContentText());
-  } catch(err) {
-    Logger.log('승인 SMS 오류: ' + err.message);
   }
 }
 
