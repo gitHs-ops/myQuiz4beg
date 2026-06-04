@@ -74,13 +74,13 @@ function notifyAdmin(id, smsOnly) {
     if (!smsOnly) {
       const ADMIN_EMAIL = 'khsq2011@gmail.com';
       const msg =
-        '[전과목 시험지 생성기(고등학교)] 이용 신청\n\n' +
+        '[전과목 시험지 생성기(초등학교)] 이용 신청\n\n' +
         '신청자: ' + id + '\n\n' +
         '승인하려면 로그인 페이지에서 관리자 버튼으로 등록해 주세요.\n' +
-        'https://giths-ops.github.io/myQuiz4high/';
+        'https://giths-ops.github.io/myQuiz4beg/';
       MailApp.sendEmail({
         to:      ADMIN_EMAIL,
-        subject: '[시험지 생성기(고등학교)] 이용 신청 — ' + id,
+        subject: '[시험지 생성기(초등학교)] 이용 신청 — ' + id,
         body:    msg
       });
     }
@@ -160,10 +160,10 @@ function registerMember(id, memo) {
 
     // 승인 알림 발송
     const approvalMsg =
-      '[전과목 시험지 생성기(고등학교)] 이용 승인 안내\n\n' +
+      '[전과목 시험지 생성기(초등학교)] 이용 승인 안내\n\n' +
       '안녕하세요!\n회원 가입이 승인되었습니다.\n' +
       '아래 주소에서 서비스를 이용하실 수 있습니다.\n' +
-      'https://giths-ops.github.io/myQuiz4high/';
+      'https://giths-ops.github.io/myQuiz4beg/';
 
     const isPhone = /^01[016789]\d{7,8}$/.test(id.replace(/-/g, ''));
     const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(id);
@@ -215,7 +215,7 @@ function sendApprovalEmail(toEmail, msg) {
   try {
     MailApp.sendEmail({
       to:      toEmail,
-      subject: '[전과목 시험지 생성기(고등학교)] 이용이 승인되었습니다',
+      subject: '[전과목 시험지 생성기(초등학교)] 이용이 승인되었습니다',
       body:    msg
     });
   } catch(err) {
